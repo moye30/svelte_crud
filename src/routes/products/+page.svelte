@@ -11,6 +11,21 @@
   let price: number | null = null;
   let image = '';
 
+  // Editar productos
+  let editingProductId: number | null = null;
+  let editingName = '';
+  let editingDescription = '';
+  let editingPrice: number | null = null;
+  let editingImage = '';
+
+  async function startEditProduct(product: any) {
+    editingProductId = product.id;
+    editingName = product.name;
+    editingDescription = product.description;
+    editingPrice = product.price;
+    editingImage = product.image;
+  }
+
   // TODO: Conseguir al usuario almacenado en sessionStorage
   onMount(async () => {
     const user = JSON.parse(sessionStorage.getItem('user') || '{}');
@@ -65,31 +80,29 @@
     }
   }
 
-  async function editProduct(id: number) {
-    const newName = prompt('Enter new product name:');
-    const newDescription = prompt('Enter new product description:');
-    const newPrice = parseFloat(prompt('Enter new product price:') || '0');
+  async function saveProduct() {
+    if (editingProductId === null) return;
 
-    if (newName && newDescription && !isNaN(newPrice)) {
-      try {
-        const response = await fetch(`http://localhost:3000/api/products/${id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: newName,
-            description: newDescription,
-            price: newPrice,
-          }),
-        });
+    try {
+      const response = await fetch(`http://localhost:3000/api/products/${editingProductId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editingName,
+          description: editingDescription,
+          price: editingPrice,
+          image: editingImage,
+        }),
+      });
 
-        if (response.ok) {
-          await loadProducts(); // Reload products after update
-        } else {
-          errorMessage = 'Failed to update product';
-        }
-      } catch (error) {
+      if (response.ok) {
+        await loadProducts(); // Reload products after update
+        editingProductId = null; // Clear editing state
+      } else {
         errorMessage = 'Failed to update product';
       }
+    } catch (error) {
+      errorMessage = 'Failed to update product';
     }
   }
 
@@ -160,15 +173,28 @@
     <ul class="products-list">
       {#each products as product}
         <li class="product-item">
-          <h2>{product.name}</h2>
-          <p style="font-style: italic; font-size: 0.8rem;">{product.description}</p>
-          <p>${product.price}</p>
-          
-          {#if userRole === 'admin'}
-            <!-- Admin CRUD buttons -->
-            <div class="admin-buttons">
-              <button on:click={() => editProduct(product.id)}>Edit</button>
-              <button on:click={() => deleteProduct(product.id)}>Delete</button>
+          {#if editingProductId === product.id}
+            <div class="edit-fields">
+              <input type="text" bind:value={editingName} placeholder="Name" />
+              <input type="text" bind:value={editingDescription} placeholder="Description" />
+              <input type="number" bind:value={editingPrice} placeholder="Price" />
+              <input type="text" bind:value={editingImage} placeholder="Image URL" />
+              <button on:click={saveProduct}>Save</button>
+              <button on:click={() => editingProductId = null}>Cancel</button>
+            </div>
+          {:else}
+            <div>
+              <h2>{product.name}</h2>
+              <p style="font-style: italic; font-size: 0.8rem;">{product.description}</p>
+              <p>${product.price}</p>
+              <img src={product.image} alt={product.name} width="100" />
+              {#if userRole === 'admin'}
+                <!-- Admin CRUD buttons -->
+                <div class="admin-buttons">
+                  <button on:click={() => startEditProduct(product)}>Edit</button>
+                  <button on:click={() => deleteProduct(product.id)}>Delete</button>
+                </div>
+              {/if}
             </div>
           {/if}
         </li>
@@ -297,6 +323,40 @@
   }
 
   .admin-buttons button:hover {
+    transform: scale(1.05);
+    transition: transform 0.3s;
+  }
+
+  .edit-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .edit-fields input {
+    padding: 5px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+  }
+
+  .edit-fields input:focus {
+    outline: none;
+    border: 1px solid #31748f;
+    transition: border 0.3s;
+  }
+
+  .edit-fields button {
+    margin-top: 10px;
+    padding: 5px;
+    border: none;
+    border-radius: 5px;
+    background-color: #31748f;
+    color: white;
+    cursor: pointer;
+  }
+
+  .edit-fields button:hover {
     transform: scale(1.05);
     transition: transform 0.3s;
   }
