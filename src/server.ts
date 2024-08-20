@@ -80,9 +80,11 @@ db.serialize(() => {
 // ENDPOINT DE USUARIOS
 app.post('/api/register', (req, res) => {
   const { username, password, role } = req.body;
+
+  const query = 'INSERT INTO users (username, password, role) VALUES (?, ?, ?)';
   const hashedPassword = bcrypt.hashSync(password, 10);
 
-  db.run("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", [username, hashedPassword, role], function(err) {
+  db.run(query, [username, hashedPassword, role], function(err) {
     if (err) {
       return res.status(400).json({ error: err.message });
     }
@@ -93,14 +95,15 @@ app.post('/api/register', (req, res) => {
 app.post('/api/login', (req, res) => {
   const { username, password } = req.body;
 
-  db.get<User>("SELECT * FROM users WHERE username = ?", [username], (err, user) => {
+  const query = 'SELECT * FROM users WHERE username = ?';
+  db.get<User>(query, [username], (err, user) => {
     if (err) {
       return res.status(400).json({ error: err.message });
     }
     if (!user || !bcrypt.compareSync(password, user.password)) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(401).json({ error: 'Credenciales inválidas' });
     }
-    res.status(200).json({ message: 'Login successful', user });
+    res.status(200).json({ message: 'Inicio de sesión exitoso', user });
   });
 });
 
