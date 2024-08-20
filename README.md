@@ -13,5 +13,6 @@ npm install typescript @types/node @types/express @types/sqlite3 @types/bcryptjs
 ```
 Y solo se necesita correr el archivo `server.ts`:
 ```bash
+npm run build
 npm start
 ```
