@@ -15,6 +15,9 @@
 		"@sveltejs/adapter-auto": "^3.0.0",
 		"@sveltejs/kit": "^2.0.0",
 		"@sveltejs/vite-plugin-svelte": "^3.0.0",
+		"@types/connect-sqlite3": "^0.9.5",
+		"@types/cors": "^2.8.17",
+		"@types/express-session": "^1.18.0",
 		"@types/node": "^22.4.1",
 		"svelte": "^4.2.7",
 		"svelte-check": "^3.6.0",
@@ -28,8 +31,12 @@
 		"@types/sqlite3": "^3.1.11",
 		"bcryptjs": "^2.4.3",
 		"body-parser": "^1.20.2",
+		"connect-sqlite3": "^0.9.15",
+		"cors": "^2.8.5",
 		"express": "^4.19.2",
+		"express-session": "^1.18.0",
 		"sqlite3": "^5.1.7",
-		"ts-node": "^10.9.2"
+		"ts-node": "^10.9.2",
+		"xss": "^1.0.15"
 	}
 }

@@ -26,16 +26,37 @@
     editingImage = product.image;
   }
 
-  // TODO: Conseguir al usuario almacenado en sessionStorage
   onMount(async () => {
-    const user = JSON.parse(sessionStorage.getItem('user') || '{}');
-    if (!user.username) {
+    try {
+      const userResponse = await fetch('http://localhost:3000/api/auth/check', {
+        method: 'GET',
+        credentials: 'include', // Enviar cookies
+      });
+
+      if (userResponse.ok) {
+        console.log('User is logged in');
+        const user = await userResponse.json();
+        userRole = user.role;
+        await loadProducts();
+      } else {
+        console.log('User is not logged in');
+        goto('/login');
+      }
+    } catch (error) {
+      console.error('Failed to check user authentication');
       goto('/login');
-    } else {
-      userRole = user.role;
-      await loadProducts();
     }
   });
+
+  // Cerrar la sesion
+  function logout() {
+    fetch('http://localhost:3000/api/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
+    }).then(() => {
+      goto('/login');
+    });
+  }
 
   async function loadProducts() {
     try {
@@ -128,12 +149,10 @@
 <section class="products-container">
   <div class="products-header">
     <h1>Productos</h1>
-    <h2>Bienvenido, {userRole}!</h2>
+    <h2>Bienvenido! {#if userRole === 'admin'} Eres un administrador {/if}</h2>
+    <!-- <h2>Bienvenido, {userRole}!</h2> -->
     <!-- Cerrar sesion -->
-    <button on:click={() => {
-      sessionStorage.removeItem('user');
-      goto('/login');
-    }}>Cerrar sesion</button>
+    <button on:click={() => logout()}>Cerrar sesion</button>
   </div>
 
   {#if errorMessage}

@@ -2,21 +2,66 @@ import express from 'express';
 import bodyParser from 'body-parser';
 import bcrypt from 'bcryptjs';
 import sqlite3 from 'sqlite3';
+import cors from 'cors';
+import session from 'express-session';
+import SqliteStore from 'connect-sqlite3';
 
+// XSS protection
+import xss from 'xss';
+
+const SQLiteSessionStore = SqliteStore(session);
 const app = express();
 const port = 3000;
 
 interface User {
   id: number;
-  username: string;
+  email: string;
   password: string;
   role: string;
 }
 
+// Middleware para autenticación
+declare module 'express-session' {
+  interface SessionData {
+    userId: number;
+    userRole: string;
+  }
+}
+function authMiddleware(req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: 'No autenticado' });
+  }
+  next();
+}
+
+// Configurar sesiones
+app.use(session({
+  store: new SQLiteSessionStore({ db: 'sessions.db', dir: './' }) as unknown as session.Store,
+  secret: 'my-secret-key',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    maxAge: 24 * 60 * 60 * 1000, // 24 horas
+    secure: false, // Cambiar si https
+    httpOnly: true, // Asegura que el cookie solo sea accesible por HTTP
+    sameSite: 'lax', // Protección contra CSRF
+  }
+}));
+
+// Middleware para agregar cabeceras de seguridad
+app.use((req, res, next) => {
+  res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self'");
+  next();
+});
+
+// Configurar CORS middleware
+app.use(cors({
+  origin: 'http://localhost:5173',
+  credentials: true
+}));
 app.use(bodyParser.json());
 
 // Inicializar la base de datos
-// const db = new sqlite3.Database(':memory:'); // Use a persistent database in production
 const db = new sqlite3.Database('database.db');
 
 // Crear tablas por defecto
@@ -25,7 +70,7 @@ db.serialize(() => {
   db.run(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT UNIQUE,
+      email TEXT UNIQUE,
       password TEXT,
       role TEXT
     );
@@ -79,33 +124,60 @@ db.serialize(() => {
 
 // ENDPOINT DE USUARIOS
 app.post('/api/register', (req, res) => {
-  const { username, password, role } = req.body;
+  const email = xss(req.body.email);
+  const password = xss(req.body.password);
+  const role = xss(req.body.role);
 
-  const query = 'INSERT INTO users (username, password, role) VALUES (?, ?, ?)';
-  const hashedPassword = bcrypt.hashSync(password, 10);
-
-  db.run(query, [username, hashedPassword, role], function(err) {
+  const hashedPassword = bcrypt.hashSync(password, 12);
+  const query = 'INSERT INTO users (email, password, role) VALUES (?, ?, ?)';
+  db.run(query, [email, hashedPassword, role], function(err) {
     if (err) {
       return res.status(400).json({ error: err.message });
     }
-    res.status(201).json({ id: this.lastID });
+    res.status(201).json({ message: 'Usuario creado', userId: this.lastID });
   });
 });
 
-app.post('/api/login', (req, res) => {
-  const { username, password } = req.body;
-
-  const query = 'SELECT * FROM users WHERE username = ?';
-  db.get<User>(query, [username], (err, user) => {
+app.post('/api/auth/logout', (req, res) => {
+  req.session.destroy((err: any) => {
     if (err) {
-      return res.status(400).json({ error: err.message });
+      return res.status(500).json({ error: 'Error al cerrar sesión' });
     }
-    if (!user || !bcrypt.compareSync(password, user.password)) {
-      return res.status(401).json({ error: 'Credenciales inválidas' });
-    }
-    res.status(200).json({ message: 'Inicio de sesión exitoso', user });
+    res.json({ message: 'Sesión cerrada' });
   });
 });
+
+app.post('/api/auth/login', (req, res) => {
+  const email = xss(req.body.email);
+  const password = xss(req.body.password);
+
+  const query = 'SELECT * FROM users WHERE email = ?';
+  db.get(query, [email], (err, row: User) => {
+    if (err) {
+      return res.status(500).json({ error: 'Error al buscar usuario' });
+    }
+    if (!row) {
+      return res.status(401).json({ error: 'Usuario no encontrado' });
+    }
+
+    if (!bcrypt.compareSync(password, row.password)) {
+      return res.status(401).json({ error: 'Contraseña incorrecta' });
+    }
+
+    // Autenticado correctamente, guardar el ID del usuario en
+    req.session.userId = row.id;
+    req.session.userRole = row.role;
+    console.log('Session:', req.session); // Debugging line
+    res.json({ message: 'Autenticado', userId: row.id, userRole: row.role });
+  });
+});
+
+app.get('/api/auth/check', authMiddleware, (req, res) => {
+  // Si el middleware de autenticación no lanza un error, el usuario está autenticado
+  console.log('Session:', req.session); // Debugging line
+  res.json({ authenticated: true, userId: req.session.userId, userRole: req.session.userRole });
+});
+
 
 // ENDPOINT DE PRODUCTOS
 app.get('/api/products', (req, res) => {
@@ -124,7 +196,10 @@ app.get('/api/products', (req, res) => {
 
 // Crear producto endpoint
 app.post('/api/products', (req, res) => {
-  const { name, description, price, image } = req.body;
+  const name = xss(req.body.name);
+  const description = xss(req.body.description);
+  const price = xss(req.body.price);
+  const image = xss(req.body.image);
 
   if (!name || !description || !price) {
     return res.status(400).json({ error: 'Name, description, and price are required' });
@@ -153,8 +228,11 @@ app.post('/api/products', (req, res) => {
 
 // endpoint editar
 app.put('/api/products/:id', (req, res) => {
-  const { id } = req.params;
-  const { name, description, price, image } = req.body;
+  const id = req.params.id;
+  const name = xss(req.body.name);
+  const description = xss(req.body.description);
+  const price = xss(req.body.price);
+  const image = xss(req.body.image);
 
   const query = `
     UPDATE products

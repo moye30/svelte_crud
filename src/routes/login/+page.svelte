@@ -1,32 +1,28 @@
 <script lang="ts">
-  let username = '';
+  let email = '';
   let password = '';
   let errorMessage = '';
 
   async function login() {
-    // const response = await fetch('/api/login', {
-    const response = await fetch('http://localhost:3000/api/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ username, password }),
-    });
+    try {
+      const response = await fetch('http://localhost:3000/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ email, password }),
+      });
 
-    if (response.ok) {
-      // Si el login es exitoso, redirigir al usuario a la pagina de inicio
-      const data = await response.json();
-      console.log('Login successful:', data);
-
-      // Aqui se puede redirigir al usuario a la pagina de inicio o mostrar un mensaje de exito
-      // Guardar el usuario en sessionStorage
-      sessionStorage.setItem('user', JSON.stringify(data.user));
-      // Redirigir al usuario a la pagina de productos
-      window.location.href = '/products';
-    } else {
-      // En caso de error, mostrar un mensaje de error
-      const data = await response.json();
-      errorMessage = data.error;
+      if (response.ok) {
+        const data = await response.json();
+        localStorage.setItem('token', data.token);
+        window.location.href = '/products';
+      } else {
+        errorMessage = 'Correo electronico o contraseña incorrectos';
+      }
+    } catch (error) {
+      errorMessage = 'Error al iniciar sesion';
     }
   }
 </script>
@@ -36,14 +32,19 @@
   <form class="login-form" on:submit|preventDefault={login}>
     <input class="form-input"
       type="text"
-      bind:value={username}
-      placeholder="Usuario" required />
+      bind:value={email}
+      placeholder="Correo electronico" required />
     <input class="form-input"
       type="password"
       bind:value={password}
       placeholder="Contraseña" required />
     <button type="submit">Iniciar Sesion</button>
   </form>
+
+  {#if errorMessage}
+    <p class="error">{errorMessage}</p>
+  {/if}
+
   <div class="register-container">
     <a href="/register">
       No tiene cuenta? <span style="color: #31748f;">Registrate</span>
