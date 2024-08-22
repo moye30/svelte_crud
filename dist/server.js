@@ -24,8 +24,6 @@ const transporter = nodemailer.createTransport({
     auth: {
         user: process.env.AUTH_MAIL,
         pass: process.env.AUTH_PASS
-        // user: "awtgerry@gmail.com",
-        // pass: "lhqz hvcf urdo tahz "
     }
 });
 function sendOtp(email, code) {
