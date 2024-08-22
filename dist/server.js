@@ -4,12 +4,46 @@ import bcrypt from 'bcryptjs';
 import sqlite3 from 'sqlite3';
 import cors from 'cors';
 import session from 'express-session';
+import nodemailer from 'nodemailer';
 import SqliteStore from 'connect-sqlite3';
+import { v4 as uuidv4 } from "uuid";
+import dotenv from 'dotenv';
+// require('dotenv').config();
+dotenv.config();
 // XSS protection
 import xss from 'xss';
 const SQLiteSessionStore = SqliteStore(session);
 const app = express();
 const port = 3000;
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false,
+    // Leer .env para obtener el correo y contraseña
+    auth: {
+        user: process.env.AUTH_MAIL,
+        pass: process.env.AUTH_PASS
+        // user: "awtgerry@gmail.com",
+        // pass: "lhqz hvcf urdo tahz "
+    }
+});
+function sendOtp(email, code) {
+    const mailOptions = {
+        from: process.env.AUTH_MAIL,
+        to: email,
+        subject: 'Código de autenticación',
+        text: `Tu código de autenticación es: ${code}`
+    };
+    transporter.sendMail(mailOptions, (err, info) => {
+        if (err) {
+            console.error('Error enviando correo:', err);
+        }
+        else {
+            console.log('Correo enviado:', info.response);
+        }
+    });
+}
 function authMiddleware(req, res, next) {
     if (!req.session.userId) {
         return res.status(401).json({ error: 'No autenticado' });
@@ -50,7 +84,8 @@ db.serialize(() => {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       email TEXT UNIQUE,
       password TEXT,
-      role TEXT
+      role TEXT,
+      otp TEXT
     );
   `, (err) => {
         if (err) {
@@ -138,16 +173,31 @@ app.post('/api/auth/login', (req, res) => {
         if (!bcrypt.compareSync(password, row.password)) {
             return res.status(401).json({ error: 'Contraseña incorrecta' });
         }
+        // MFA (numbers)
+        const otp = uuidv4().substr(0, 6);
         // Autenticado correctamente, guardar el ID del usuario en
         req.session.userId = row.id;
         req.session.userRole = row.role;
-        console.log('Session:', req.session); // Debugging line
-        res.json({ message: 'Autenticado', userId: row.id, userRole: row.role });
+        req.session.otp = otp;
+        req.session.isVerified = false;
+        sendOtp(email, otp);
+        res.json({ message: 'Enviado código de autenticación' });
     });
 });
+app.post('/api/auth/verify-otp', (req, res) => {
+    const otp = xss(req.body.otp);
+    if (req.session.otp === otp) {
+        req.session.isVerified = true;
+        res.json({ message: 'Autenticado' });
+    }
+    else {
+        res.status(401).json({ error: 'Código incorrecto' });
+    }
+});
 app.get('/api/auth/check', authMiddleware, (req, res) => {
-    // Si el middleware de autenticación no lanza un error, el usuario está autenticado
-    console.log('Session:', req.session); // Debugging line
+    if (!req.session.isVerified) {
+        return res.status(401).json({ error: 'OTP not verified' });
+    }
     res.json({ authenticated: true, userId: req.session.userId, userRole: req.session.userRole });
 });
 // ENDPOINT DE PRODUCTOS

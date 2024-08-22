@@ -15,6 +15,7 @@ npm i --save-dev @types/express-session @types/connect-sqlite3
 # A lo mejor se necesita correr los siguientes:
 npm install ts-node typescript --save-dev
 npm install express sqlite3 body-parser bcryptjs express-session connect-sqlite3
+npm install nodemailer uuid
 ```
 Y correr el archivo `server.ts`:
 ```bash

@@ -36,7 +36,9 @@
       if (userResponse.ok) {
         console.log('User is logged in');
         const user = await userResponse.json();
-        userRole = user.role;
+        userRole = user.userRole;
+        console.log('User role:', userRole);
+        console.log('User:', user);
         await loadProducts();
       } else {
         console.log('User is not logged in');
