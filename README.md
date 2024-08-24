@@ -6,7 +6,7 @@ npm run dev -- --open
 ```
 
 ## Servidor
-Para el servidor se necesitan las dependencias:
+Para el servidor se usaron las dependencias:
 ```bash
 npm init -y
 
